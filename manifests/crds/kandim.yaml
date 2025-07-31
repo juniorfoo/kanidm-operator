@@ -55,6 +55,11 @@ spec:
                       additionalProperties:
                         type: string
                         default: ""
+                    storageLabels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                        default: ""
                 logLevel:
                   type: string
                   enum:
@@ -86,6 +91,11 @@ spec:
                       type: string
                       pattern: ^\d+[EPTGMK]i?$
                     storageAnnotations:
+                      type: object
+                      additionalProperties:
+                        type: string
+                        default: ""
+                    storageLabels:
                       type: object
                       additionalProperties:
                         type: string

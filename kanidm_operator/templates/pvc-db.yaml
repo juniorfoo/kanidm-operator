@@ -15,6 +15,10 @@ metadata:
     {% for key, value in db_storage_annotations.items() %}
     {{ key }}: '{{ value }}'
     {% endfor %}
+  labels:
+    {% for key, value in db_storage_labels.items() %}
+    {{ key }}: '{{ value }}'
+    {% endfor %}
 spec:
   storageClassName: {{ db_storage_class }}
   accessModes:

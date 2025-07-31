@@ -8,7 +8,7 @@ entire Single Sign On/authentication as an ``almost'' stateless deployment. It
 cannot be totally stateless, as a database is needed to store current
 passwords/let users change them; however, all the configuration can be! 
 
-# Requirements
+## Requirements
 
 * [cert-manager](https://cert-manager.io/): Kanidm needs to generate TLS
 certificates for its operation and uses a certificate manager to generate these. 
@@ -18,19 +18,19 @@ certificates for its operation and uses a certificate manager to generate these.
 
 First, apply the custom resource definitions:
 
-```
+```bash
 kubectl apply -k github.com/toastedcrumpets/kanidm-operator/manifests/crds?ref=master
 ```
 
 Then, deploy the operator:
 
-```
+```bash
 kubectl apply -k github.com/toastedcrumpets/kanidm-operator/manifests/operator?ref=master
 ```
 
 This will deploy the operator in the `kanidm-system` namespace. You are now ready to configure/deploy as many Kanidm instances as you like. The examples show how to configure one.
 
-# Examples
+## Examples
 
 The operator is end-to-end tested using the definitions in [manifests/examples folder](manifests/examples). You can browse these as all options are documented in there.
 
@@ -42,21 +42,21 @@ The operator is end-to-end tested using the definitions in [manifests/examples f
 
 Each user account is created with a random password. You can reset this to a new random password by running a command in the kanidm deployment pod, i.e..
 
-```
+```bash
 kubectl exec -n kanidm `kubectl get pod -n kanidm -l=app.kubernetes.io/name=kanidm -o name` -- kanidmd recover-account someusername
 ```
 
 However, the most important passwords are for the `admin` and `idm_admin` accounts. These
 are stored in k8s secrets. You should not recover/change these, as the operator uses them to perform its operations. You can extract these by reading the secrets,
 
-```
+```bash
 kubectl get secret -n kanidm admin-credentials -o jsonpath='{.data.password}' | base64 --decode
 kubectl get secret -n kanidm idm-admin-credentials -o jsonpath='{.data.password}' | base64 --decode
 ```
 
 If you accidentally recover/change these passwords, just update the secrets to the new values.
 
-# Developing
+## Developing
 
 To develop on the operator, you'll want to run it locally.
 You need to have a k8s cluster setup with a [working kube config](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) on your development system. You'll also need access to the kanidm deployment (e.g., https://idm.example.com).
@@ -67,10 +67,10 @@ You're now ready to develop. You can install/reinstall the CRDS but do not insta
 
 To run the operator, you will again want a command like in the end of the [Dockerfile](Dockerfile), i.e.
 
-```
+```bash
 poetry run kopf run --standalone --all-namespaces 
 ```
 
-## Unit tests
+### Unit tests
 
 There is a full End-to-end set of unit tests in github actions. The action boots a KIND k8s cluster, sets up an ingress controller (nginx), cert-manager with a self-signed Certificate Authority, then installs the operator. It then deploys all the examples and checks they deployed without errors.
