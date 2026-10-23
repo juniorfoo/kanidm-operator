@@ -87,15 +87,15 @@ Images are built and pushed to Docker Hub by [`.github/workflows/dockerhub-cd.ya
 | Trigger | Image |
 |---------|-------|
 | Push to `master` | `juniorfoo/kanidm-operator:latest` (and branch/SHA tags) |
-| Git tag `v1.10.3-op.1` | `juniorfoo/kanidm-operator:1.10.3-op.1` |
+| Git tag `v1.10.5-op.1` | `juniorfoo/kanidm-operator:1.10.5-op.1` |
 
-The operator version in `pyproject.toml` (for example `1.10.3+1`) tracks the supported Kanidm release. Tag git releases as `v1.10.3-op.1` for Docker-friendly version tags.
+The operator version in `pyproject.toml` (for example `1.10.5+1`) tracks the supported Kanidm release. Tag git releases as `v1.10.5-op.1` for Docker-friendly version tags.
 
 To cut a release:
 
 ```bash
-git tag v1.10.3-op.1
-git push origin v1.10.3-op.1
+git tag v1.10.5-op.1
+git push origin v1.10.5-op.1
 ```
 
 Pin a cluster to that image by setting `newTag` in `manifests/operator/kustomization.yaml`.

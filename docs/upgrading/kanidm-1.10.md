@@ -1,12 +1,12 @@
 # Upgrading to Kanidm 1.10
 
-This guide covers operator changes for Kanidm **1.10.3**, breaking API differences discovered during the upgrade, and how to run the test suite locally.
+This guide covers operator changes for Kanidm **1.10.x** (currently **1.10.5**), breaking API differences discovered during the upgrade, and how to run the test suite locally.
 
 ## Summary
 
 | Area | Change |
 |------|--------|
-| Server image | Set `spec.version: 1.10.3` (or your target 1.10.x patch) on the `Kanidm` CR |
+| Server image | Set `spec.version: 1.10.5` (or your target 1.10.x patch) on the `Kanidm` CR |
 | `server.toml` | Must use config **version 2** (required since Kanidm 1.6) |
 | Reverse proxy trust | `trust_x_forward_for` replaced by `[http_client_address_info]` |
 | `kanidmd recover-account` | `-o json` removed; passwords appear in log output |
@@ -21,7 +21,19 @@ Example path: 1.5 → 1.6 → … → 1.10.
 
 See the [Kanidm server update guide](https://kanidm.github.io/kanidm/stable/server_updates.html) before upgrading production data.
 
-Fresh installs can set `spec.version: 1.10.3` directly.
+Fresh installs can set `spec.version: 1.10.5` directly.
+
+## Patch releases within 1.10
+
+Patch upgrades (for example 1.10.3 → 1.10.5) do not require operator code changes beyond version pins. Update the `Kanidm` CR `spec.version` and roll the server deployment.
+
+| Release | Notes |
+|---------|--------|
+| **1.10.5** (2026-08-02) | **Security (High):** Incomplete fix for SCIM filter parsing depth; crafted unauthenticated SCIM queries could exhaust the stack (DoS). Advisory [GHSA-2pm5-6m23-h692](https://github.com/kanidm/kanidm/security/advisories/GHSA-2pm5-6m23-h692). |
+| **1.10.4** (2026-06-23) | **Security (High):** LDAP BER parsing lacked a bound on parsing depth; unauthenticated LDAP traffic could exhaust the stack (DoS). Advisory [GHSA-qcrp-p3rq-pffr](https://github.com/kanidm/kanidm/security/advisories/GHSA-qcrp-p3rq-pffr). |
+| **1.10.3** (2026-05-14) | Bug fixes for rare 1.9→1.10 upgrade and unixd resolver deadlock. |
+
+No breaking changes or database migrations are documented for 1.10.4 or 1.10.5.
 
 ## Operator code changes
 

@@ -25,4 +25,4 @@ Kanidm itself needs persistent storage for passwords and account state, but **co
 
 ## Supported Kanidm version
 
-The operator currently targets **Kanidm 1.10.3**. Set `spec.version` on the `Kanidm` custom resource to pin the server image tag.
+The operator currently targets **Kanidm 1.10.5**. Set `spec.version` on the `Kanidm` custom resource to pin the server image tag.

@@ -9,7 +9,7 @@ metadata:
   name: kanidm-instance
   namespace: kanidm
 spec:
-  version: 1.10.3
+  version: 1.10.5
   domain: idm.example.com
   certificate:
     issuer: letsencrypt-prod

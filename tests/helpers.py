@@ -10,7 +10,7 @@ import yaml
 
 KANIDM_NAMESPACE = "kanidm"
 KANIDM_DOMAIN = "idm.example.com"
-KANIDM_VERSION = "1.10.3"
+KANIDM_VERSION = "1.10.5"
 
 
 def kubectl(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
