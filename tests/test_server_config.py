@@ -10,7 +10,7 @@ def _render_server_toml(**variables) -> str:
         loader=FileSystemLoader("kanidm_operator/templates"),
         autoescape=select_autoescape(["toml", "yaml", "yml", "json"]),
     )
-    template = env.get_template("server.toml", globals={"namespace": "kanidm", "version": "1.10.3"})
+    template = env.get_template("server.toml", globals={"namespace": "kanidm", "version": "1.10.5"})
     rendered = template.render(**variables)
     configmap = __import__("yaml").safe_load(rendered)
     return configmap["data"]["server.toml"]
