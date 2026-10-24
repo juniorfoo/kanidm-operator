@@ -37,6 +37,7 @@ The project has two test layers:
 |-----------|---------|
 | `tests/test_server_config.py` | Unit tests for `server.toml` rendering and password parsing |
 | `tests/test_kanidm_operator.py` | End-to-end test against a real KIND cluster |
+| `tests/test_operator_rbac.py` | Shipped ClusterRole vs operator ServiceAccount (`kubectl auth can-i`) |
 
 ### End-to-end coverage
 
@@ -63,6 +64,10 @@ poetry run pytest -v
 
 CI runs the same tests on every pull request (see `.github/workflows/dockerhub-cd.yaml`).
 
+### How e2e runs the operator
+
+End-to-end tests start the operator with `kopf.testing.KopfRunner` on the test runner host, using the default kubeconfig (cluster-admin on the KIND cluster). They do **not** deploy `manifests/operator` or run the operator pod under `kanidm-operator-account`, so RBAC gaps in the shipped ClusterRole are invisible to those tests. `tests/test_operator_rbac.py` applies the operator kustomize overlay and checks that the ServiceAccount may perform every verb declared in `manifests/operator/cluster-role.yaml`.
+
 ## Documentation
 
 Build the site locally:
@@ -87,9 +92,9 @@ Images are built and pushed to Docker Hub by [`.github/workflows/dockerhub-cd.ya
 | Trigger | Image |
 |---------|-------|
 | Push to `master` | `juniorfoo/kanidm-operator:latest` (and branch/SHA tags) |
-| Git tag `v1.10.5-op.2` | `juniorfoo/kanidm-operator:1.10.5-op.2` |
+| Git tag `v1.10.5-op.3` | `juniorfoo/kanidm-operator:1.10.5-op.3` |
 
-The operator version in `pyproject.toml` (for example `1.10.5+2`) tracks the supported Kanidm release. Tag git releases as `v1.10.5-op.2` for Docker-friendly version tags.
+The operator version in `pyproject.toml` (for example `1.10.5+3`) tracks the supported Kanidm release. Tag git releases as `v1.10.5-op.3` for Docker-friendly version tags.
 
 To cut a release:
 

@@ -136,6 +136,9 @@ poetry run pytest -v
 | `test_kanidm_version_upgrade.py` | Patch `spec.version` (1.10.3 → 1.10.5) rolls the server Deployment |
 | `test_kanidm_version_resume.py` | Resume heals drift when CR/kopf state is 1.10.5 but Deployment is 1.10.3 |
 | `test_kanidm_version.py` | Unit tests for upgrade policy validation |
+| `test_operator_rbac.py` | Operator ServiceAccount vs shipped ClusterRole (`kubectl auth can-i`) |
+
+The e2e suite runs kopf on the CI host with cluster-admin credentials, not the in-cluster ServiceAccount. Version upgrade/resume e2e tests therefore exercise `get_deployed_server_image()` with admin RBAC; `test_operator_rbac.py` catches missing deployment `get`/`list`/`watch` on the shipped role.
 
 The e2e suite does not yet cover delete flows or the Grafana OAuth2 example manifest. High-availability mode is not reconciled on update (same as create).
 
