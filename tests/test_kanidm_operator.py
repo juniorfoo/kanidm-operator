@@ -133,6 +133,8 @@ def test_resource_lifecycle():
         socket.gethostbyname("idm.example.com")
         assert_https_reachable(ca_bundle)
 
+        verifier = KanidmVerifier()
+
         subprocess.run(
             f"kubectl apply -f {os.path.join(example, 'users.yaml')}",
             shell=True,
@@ -141,7 +143,7 @@ def test_resource_lifecycle():
             capture_output=True,
         )
         wait_processed("user", "marcus")
-        KanidmVerifier().assert_person("marcus", "Marcus", ["marcus@example.com"])
+        verifier.assert_person("marcus", "Marcus", ["marcus@example.com"])
 
         subprocess.run(
             f"kubectl apply -f {os.path.join(example, 'groups.yaml')}",
@@ -151,7 +153,7 @@ def test_resource_lifecycle():
             capture_output=True,
         )
         wait_processed("group", "git-users")
-        KanidmVerifier().assert_group("git-users", ["marcus"])
+        verifier.assert_group("git-users", ["marcus"])
 
         subprocess.run(
             f"kubectl apply -f {os.path.join(fixtures, 'oauth2-forgejo.yaml')}",
@@ -161,7 +163,6 @@ def test_resource_lifecycle():
             capture_output=True,
         )
         wait_processed("oauth2-clients", "forgejo-oauth")
-        verifier = KanidmVerifier()
         verifier.assert_oauth2_client("forgejo", "Forgejo", "https://git.example.com")
         verifier.assert_oauth2_k8s_secret("forgejo", "forgejo-oauth2-credentials")
 
