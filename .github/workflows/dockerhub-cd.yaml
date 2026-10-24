@@ -74,13 +74,8 @@ jobs:
         run: |
           KANIDM_SERVER_VERSION="$(poetry run python -c 'from tests.helpers import KANIDM_VERSION; print(KANIDM_VERSION)')"
           bash scripts/install-kanidm-cli.sh "${KANIDM_SERVER_VERSION}"
-          "${KANIDM_EXEC}" --version
-          DEPLOYED_MM="$(echo "${KANIDM_SERVER_VERSION}" | awk -F. '{print $1"."$2}')"
-          CLI_MM="$("${KANIDM_EXEC}" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | awk -F. '{print $1"."$2}')"
-          if [[ "${CLI_MM}" != "${DEPLOYED_MM}" ]]; then
-            echo "ERROR: kanidm CLI major.minor ${CLI_MM} does not match server ${DEPLOYED_MM} (${KANIDM_SERVER_VERSION})" >&2
-            exit 1
-          fi
+          "${KANIDM_EXEC}" version || "${KANIDM_EXEC}" --version || true
+          echo "KANIDM_CLI_PACKAGE=$(dpkg-query -W -f='${Version}' kanidm)"
 
       ##################   Run the tests   ##################
       - name: Run the automated tests

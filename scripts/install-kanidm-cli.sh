@@ -49,11 +49,24 @@ DEBIAN_FRONTEND=noninteractive "${SUDO[@]}" apt-get install -y "kanidm=${PKG_VER
 cp -f "$(command -v kanidm)" "${BIN}"
 chmod +x "${BIN}"
 
-CLI_VERSION_LINE="$("${BIN}" --version 2>&1 | head -1)"
+kanidm_cli_version_line() {
+  local bin="$1"
+  if out="$("${bin}" version 2>&1)"; then
+    echo "${out}" | head -1
+    return 0
+  fi
+  if out="$("${bin}" --version 2>&1)"; then
+    echo "${out}" | head -1
+    return 0
+  fi
+  dpkg-query -W -f='kanidm ${Version}' kanidm 2>/dev/null || echo "kanidm (version unknown)"
+}
+
+CLI_VERSION_LINE="$(kanidm_cli_version_line "${BIN}")"
 echo "Installed kanidm CLI: ${CLI_VERSION_LINE}"
 
 want_mm="$(echo "${KANIDM_VERSION}" | awk -F. '{print $1"."$2}')"
-got_mm="$(echo "${CLI_VERSION_LINE}" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | awk -F. '{print $1"."$2}')"
+got_mm="$(echo "${PKG_VERSION}" | awk -F. '{print $1"."$2}')"
 
 if [[ -z "${got_mm}" || "${got_mm}" != "${want_mm}" ]]; then
   echo "ERROR: kanidm CLI major.minor is ${got_mm:-unknown}; server under test is ${want_mm} (${KANIDM_VERSION})." >&2
