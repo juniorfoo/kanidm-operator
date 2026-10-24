@@ -72,7 +72,7 @@ jobs:
         run: poetry install --no-root --with dev
       - name: Install kanidm CLI (pinned to e2e server version)
         run: |
-          KANIDM_SERVER_VERSION="$(python -c 'from tests.helpers import KANIDM_VERSION; print(KANIDM_VERSION)')"
+          KANIDM_SERVER_VERSION="$(poetry run python -c 'from tests.helpers import KANIDM_VERSION; print(KANIDM_VERSION)')"
           bash scripts/install-kanidm-cli.sh "${KANIDM_SERVER_VERSION}"
           "${KANIDM_EXEC}" --version
           DEPLOYED_MM="$(echo "${KANIDM_SERVER_VERSION}" | awk -F. '{print $1"."$2}')"
