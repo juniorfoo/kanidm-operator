@@ -59,10 +59,16 @@ def operator_rbac_applied():
     kubectl("delete", "-k", str(OPERATOR_KUSTOMIZE), "--ignore-not-found", check=False)
 
 
+_CLUSTER_ROLE_CHECKS = list(_iter_cluster_role_checks())
+
+
 @pytest.mark.parametrize(
     ("api_group", "resource", "verb"),
-    list(_iter_cluster_role_checks()),
-    ids=lambda p: f"{p[2]}_{p[1]}_{p[0] or 'core'}",
+    _CLUSTER_ROLE_CHECKS,
+    ids=[
+        f"{verb}_{resource}_{api_group or 'core'}"
+        for api_group, resource, verb in _CLUSTER_ROLE_CHECKS
+    ],
 )
 def test_operator_service_account_can_use_shipped_cluster_role(
     operator_rbac_applied, api_group: str, resource: str, verb: str
