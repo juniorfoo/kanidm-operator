@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.10.5-op.2 (unreleased)
+## 1.10.5-op.3 (unreleased)
+
+- Grant `get`, `list`, and `watch` on `apps/deployments` in the operator ClusterRole so in-cluster reconciliation can read the live server image (fixes 403 on `on_resume` / `on_update` version drift handling).
+- Add `tests/test_operator_rbac.py` to assert the shipped ServiceAccount can perform every verb in `manifests/operator/cluster-role.yaml`.
+
+## 1.10.5-op.2
 
 - Reconcile `Kanidm` CR updates: changing `spec.version` (and ports or other rendered fields) patches the server `Deployment`, `ConfigMap`, and related child resources.
 - On operator resume, detect Deployment image drift versus `spec.version` and roll the server without requiring a CR spec change (covers clusters already at the target version in GitOps/kopf state).

@@ -32,7 +32,7 @@ rules:
     verbs: [create, delete]
   - apiGroups: [apps]
     resources: [deployments]
-    verbs: [create, delete, patch]
+    verbs: [create, delete, get, list, patch, watch]
   - apiGroups: [""]
     resources: [persistentvolumeclaims, secrets, services, configmaps]
     verbs: [create, delete, get, list, update, patch]
