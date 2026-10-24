@@ -17,6 +17,7 @@ from kubernetes.client.models.v1_pod_status import V1PodStatus
 from kubernetes.stream import stream
 
 from kanidm_operator.deploy.version import (
+    KanidmVersion,
     VersionUpgradeError,
     parse_server_image,
     validate_version_upgrade,
@@ -56,6 +57,43 @@ def deploy_kanidm_static_resources(deployer: Deployer, spec: KanidmResource) -> 
         db_storage_annotations=spec["database"].get("storageAnnotations", {}),
         db_storage_labels=spec["database"].get("storageLabels", {}),
     )
+
+
+def deploy_kanidm_version_drift_resources(deployer: Deployer, spec: KanidmResource) -> None:
+    """
+    Patch only resources required to align a running server with spec.version.
+
+    Used on operator resume when kopf's last-handled-configuration already matches
+    the CR but the Deployment image drifted (for example after a no-op update handler).
+    Re-rendering Certificate/Service/Ingress on resume is avoided: those objects are
+    unchanged when only the server tag drifts, and a full reconcile could apply
+    unrelated template churn for clusters created by older operator builds.
+    """
+    deployer.deploy(
+        "server.toml",
+        domain=spec["domain"],
+        log_level=spec.get("logLevel", "info"),
+        ldap_port=spec.get("ldapPort", "3890"),
+        http_port=spec.get("webPort", "8443"),
+        db_fs_type=spec["database"]["fsType"],
+        db_arc_size=spec["database"]["arcSize"],
+        backup_enabled=spec["backup"]["enabled"],
+        backup_schedule=spec["backup"]["schedule"],
+        backup_versions=spec["backup"]["versions"],
+        trust_x_forwarded_for=spec["ingress"]["trustXForwardedFor"],
+    )
+
+    if not spec["highAvailability"]["enabled"]:
+        deployer.deploy(
+            "deployment.yaml",
+            http_port=spec.get("webPort", "8443"),
+            ldap_port=spec.get("ldapPort", "3890"),
+            image=f"kanidm/server:{spec['version']}",
+        )
+    else:
+        deployer.logger.warning(
+            "highAvailability mode is not implemented; skipping Deployment drift reconcile"
+        )
 
 
 def deploy_kanidm_reconciled_resources(deployer: Deployer, spec: KanidmResource) -> None:
@@ -127,6 +165,19 @@ def spec_needs_reconcile(old_spec: KanidmResource, new_spec: KanidmResource) -> 
         if old_spec.get(key) != new_spec.get(key):
             return True
     return False
+
+
+def deployment_version_drifts_from_spec(namespace: str, spec_version: str) -> bool:
+    """Return True when the live Deployment image tag differs from spec.version."""
+    image = get_deployed_server_image(namespace)
+    if image is None:
+        return False
+    try:
+        deployed = parse_server_image(image)
+        target = KanidmVersion.parse(spec_version)
+    except ValueError:
+        return True
+    return deployed != target
 
 
 def get_deployed_server_image(namespace: str) -> str | None:
@@ -284,3 +335,27 @@ async def on_update_kanidms(
     logger.info(f"Reconciling kanidm instance {name} in namespace {namespace}")
     deployer = Deployer(namespace, spec["version"], logger)
     deploy_kanidm_reconciled_resources(deployer, spec)
+
+
+@kopf.on.resume("kanidm.github.io", "v1alpha1", "kanidms")
+async def on_resume_kanidms(
+    spec: KanidmResource,
+    name: str,
+    namespace: str,
+    logger: Logger,
+    **kwargs,
+):
+    if not deployment_version_drifts_from_spec(namespace, spec["version"]):
+        logger.debug(
+            "Kanidm Deployment image matches spec.version on resume; skipping drift reconcile"
+        )
+        return
+
+    logger.info(
+        "Kanidm Deployment image drifts from spec.version on resume for %s/%s",
+        namespace,
+        name,
+    )
+    validate_spec_version_upgrade(namespace, spec["version"], logger)
+    deployer = Deployer(namespace, spec["version"], logger)
+    deploy_kanidm_version_drift_resources(deployer, spec)

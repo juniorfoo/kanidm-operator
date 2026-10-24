@@ -151,6 +151,27 @@ def assert_kanidm_deployment(version: str = KANIDM_VERSION) -> None:
     assert deployment["spec"]["strategy"]["type"] == "Recreate"
 
 
+def stamp_kopf_last_handled_configuration(resource: str, name: str) -> None:
+    """Make kopf believe the current CR body is already handled (Joe's drift scenario)."""
+    from kopf._cogs.configs.diffbase import AnnotationsDiffBaseStorage
+
+    cr = kubectl_json("get", resource, name, "-n", KANIDM_NAMESPACE)
+    storage = AnnotationsDiffBaseStorage()
+    essence = storage.build(body=cr)
+    encoded = json.dumps(essence, separators=(",", ":")) + "\n"
+    annotation_key = "kopf.zalando.org/last-handled-configuration"
+    kubectl(
+        "patch",
+        resource,
+        name,
+        "-n",
+        KANIDM_NAMESPACE,
+        "--type=merge",
+        "-p",
+        json.dumps({"metadata": {"annotations": {annotation_key: encoded}}}),
+    )
+
+
 def deployment_image_version() -> str:
     deployment = kubectl_json("get", "deployment", "kanidm", "-n", KANIDM_NAMESPACE)
     image = deployment["spec"]["template"]["spec"]["containers"][0]["image"]
