@@ -246,7 +246,7 @@ def _finalize_kanidm_status(
 
 
 @kopf.on.create("kanidm.github.io", "v1alpha1", "kanidms")
-async def on_create_kanidms(
+def on_create_kanidms(
     spec: KanidmResource,
     name: str,
     namespace: str,
@@ -373,7 +373,7 @@ async def on_create_kanidms(
 
 
 @kopf.on.update("kanidm.github.io", "v1alpha1", "kanidms")
-async def on_update_kanidms(
+def on_update_kanidms(
     spec: KanidmResource,
     old: dict,
     name: str,
@@ -415,7 +415,7 @@ async def on_update_kanidms(
 
 
 @kopf.on.resume("kanidm.github.io", "v1alpha1", "kanidms")
-async def on_resume_kanidms(
+def on_resume_kanidms(
     spec: KanidmResource,
     name: str,
     namespace: str,
