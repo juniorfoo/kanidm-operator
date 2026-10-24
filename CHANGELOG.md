@@ -1,6 +1,10 @@
 # Changelog
 
-## 1.10.5-op.4 (unreleased)
+## 1.10.5-op.5 (unreleased)
+
+- Isolate kanidm CLI token cache per `KanidmCLIClient` / test verifier subprocess (`HOME` override) so concurrent `kanidm login` no longer corrupts `~/.cache/kanidm_tokens` during e2e reconciliation.
+
+## 1.10.5-op.4
 
 - Clear stale `spec.strategy.rollingUpdate` when patching the server `Deployment` to `Recreate`, fixing 422 reconcile loops on clusters upgraded from older operator builds that used `RollingUpdate`.
 

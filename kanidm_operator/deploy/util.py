@@ -4,6 +4,7 @@ import kopf
 from kubernetes.client.models.v1_secret import V1Secret
 from kubernetes.client.models.v1_secret_list import V1SecretList
 from kanidm_operator.deployer import slugify
+from kanidm_operator.kanidm_cli_cache import isolated_kanidm_cli_env
 from logging import Logger
 from base64 import b64decode
 import subprocess
@@ -71,12 +72,13 @@ class KanidmCLIClient:
 
         password = b64decode(secret.data["password"].encode("utf-8")).decode("utf-8")
 
-        self.env = os.environ.copy()
-        self.env.update({
+        base_env = os.environ.copy()
+        base_env.update({
             "KANIDM_URL": "https://" + self.kanidm_spec['spec']["domain"],
             "KANIDM_NAME": username,
             "KANIDM_PASSWORD": password,
         })
+        self.env, self._kanidm_cli_cache = isolated_kanidm_cli_env(base_env)
 
         self.login()
 

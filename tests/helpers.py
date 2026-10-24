@@ -8,6 +8,8 @@ import os
 import subprocess
 import yaml
 
+from kanidm_operator.kanidm_cli_cache import isolated_kanidm_cli_env
+
 KANIDM_NAMESPACE = "kanidm"
 KANIDM_DOMAIN = "idm.example.com"
 KANIDM_VERSION = "1.10.5"
@@ -49,9 +51,9 @@ class KanidmVerifier:
 
     def __init__(self) -> None:
         self.kanidm_exec = os.environ.get("KANIDM_EXEC", "kanidm")
-        self.env = os.environ.copy()
+        base_env = os.environ.copy()
         password = secret_data(KANIDM_NAMESPACE, "idm-admin-credentials", "password")
-        self.env.update(
+        base_env.update(
             {
                 "KANIDM_URL": f"https://{KANIDM_DOMAIN}",
                 "KANIDM_NAME": "idm_admin",
@@ -60,7 +62,8 @@ class KanidmVerifier:
         )
         ca_path = os.environ.get("KANIDM_CA_PATH")
         if ca_path:
-            self.env["KANIDM_CA_PATH"] = ca_path
+            base_env["KANIDM_CA_PATH"] = ca_path
+        self.env, self._kanidm_cli_cache = isolated_kanidm_cli_env(base_env)
         self._login()
 
     def _login(self) -> None:
