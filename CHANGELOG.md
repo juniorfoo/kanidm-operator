@@ -3,6 +3,7 @@
 ## 1.10.5-op.3 (unreleased)
 
 - Grant `get`, `list`, and `watch` on `apps/deployments` in the operator ClusterRole so in-cluster reconciliation can read the live server image (fixes 403 on `on_resume` / `on_update` version drift handling).
+- Remove dead ClusterRole rules: admission webhook configs (invalid `admissionregistration.k8s.io/v1` apiGroups and unused in `--standalone` kopf) and `extensions`/`batch` CronJobs (no CronJob templates; backups are in-server `online_backup`).
 - Add `tests/test_operator_rbac.py` to assert the shipped ServiceAccount can perform every verb in `manifests/operator/cluster-role.yaml`.
 
 ## 1.10.5-op.2

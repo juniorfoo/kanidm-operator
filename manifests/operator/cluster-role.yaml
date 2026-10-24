@@ -11,11 +11,6 @@ rules:
     resources: [namespaces]
     verbs: [list, watch]
 
-  # Framework: admission webhook configuration management.
-  - apiGroups: [admissionregistration.k8s.io/v1, admissionregistration.k8s.io/v1beta1]
-    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
-    verbs: [create, patch]
-
   # Framework: kopf progress events in any watched namespace.
   - apiGroups: [""]
     resources: [events]
@@ -27,9 +22,6 @@ rules:
     verbs: [list, watch, patch]
 
   # Application: other resources the operator creates and manages.
-  - apiGroups: [batch, extensions]
-    resources: [cronjobs]
-    verbs: [create, delete]
   - apiGroups: [apps]
     resources: [deployments]
     verbs: [create, delete, get, list, patch, watch]

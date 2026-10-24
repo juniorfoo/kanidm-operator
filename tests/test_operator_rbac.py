@@ -14,14 +14,10 @@ OPERATOR_KUSTOMIZE = Path(__file__).resolve().parents[1] / "manifests" / "operat
 CLUSTER_ROLE_PATH = OPERATOR_KUSTOMIZE / "cluster-role.yaml"
 OPERATOR_SA = "system:serviceaccount:kanidm-system:kanidm-operator-account"
 
-# Resources in cluster-role.yaml that are cluster-scoped (no --namespace).
+# Cluster-scoped API objects in the shipped ClusterRole (kubectl auth can-i: no --namespace).
 _CLUSTER_SCOPED = {
     ("", "namespaces"),
     ("apiextensions.k8s.io", "customresourcedefinitions"),
-    ("admissionregistration.k8s.io/v1", "validatingwebhookconfigurations"),
-    ("admissionregistration.k8s.io/v1", "mutatingwebhookconfigurations"),
-    ("admissionregistration.k8s.io/v1beta1", "validatingwebhookconfigurations"),
-    ("admissionregistration.k8s.io/v1beta1", "mutatingwebhookconfigurations"),
 }
 
 
