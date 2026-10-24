@@ -34,6 +34,7 @@ def test_kanidm_verifier_subprocess_env_carries_isolated_home(monkeypatch: pytes
     from tests.helpers import KanidmVerifier
 
     monkeypatch.setattr("tests.helpers.secret_data", lambda *_args, **_kwargs: "secret")
+    monkeypatch.setattr("tests.helpers.wait_for_kanidm_auth_ready", lambda *_a, **_k: None)
 
     captured_envs: list[dict[str, str]] = []
 
