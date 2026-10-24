@@ -3,6 +3,8 @@
 ## 1.10.5-op.5 (unreleased)
 
 - Isolate kanidm CLI token cache per `KanidmCLIClient` / test verifier subprocess (`HOME` override) so concurrent `kanidm login` no longer corrupts `~/.cache/kanidm_tokens` during e2e reconciliation.
+- Pin the Kanidm CLI in CI to the e2e server image version (`scripts/install-kanidm-cli.sh` via `kanidm/tools`) instead of the rolling PPA `stable` package; fail when CLI major.minor does not match the server.
+- E2e verifier waits for Kanidm `/status` and retries `kanidm login` on HTTP 503 (`missing_kopid`) before asserting server-side state.
 
 ## 1.10.5-op.4
 

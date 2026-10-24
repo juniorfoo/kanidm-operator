@@ -5,7 +5,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import ssl
 import subprocess
+import time
+import urllib.error
+import urllib.request
 import yaml
 
 from kanidm_operator.kanidm_cli_cache import isolated_kanidm_cli_env
@@ -13,6 +17,92 @@ from kanidm_operator.kanidm_cli_cache import isolated_kanidm_cli_env
 KANIDM_NAMESPACE = "kanidm"
 KANIDM_DOMAIN = "idm.example.com"
 KANIDM_VERSION = "1.10.5"
+
+KANIDM_AUTH_READY_TIMEOUT_S = 120.0
+KANIDM_AUTH_POLL_INTERVAL_S = 2.0
+KANIDM_LOGIN_503_RETRIES = 5
+
+
+def major_minor(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) < 2:
+        raise ValueError(f"invalid version: {version}")
+    return f"{parts[0]}.{parts[1]}"
+
+
+def _resolve_ca_bundle(env: dict[str, str]) -> str | None:
+    for key in ("KANIDM_CA_PATH", "REQUESTS_CA_BUNDLE"):
+        path = env.get(key) or os.environ.get(key)
+        if path and os.path.isfile(path):
+            return path
+    project_ca = os.path.join(
+        os.path.dirname(__file__), "..", "KanidmCA.crt"
+    )
+    if os.path.isfile(project_ca):
+        return os.path.abspath(project_ca)
+    system_ca = "/etc/ssl/certs/ca-certificates.crt"
+    if os.path.isfile(system_ca):
+        return system_ca
+    return None
+
+
+def _status_online(status_url: str, ca_bundle: str | None) -> bool:
+    ctx = ssl.create_default_context(cafile=ca_bundle) if ca_bundle else ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(status_url, context=ctx, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
+        return False
+    return payload.get("status") is True
+
+
+def _login_transient_503(combined_output: str) -> bool:
+    return "503" in combined_output and (
+        "missing_kopid" in combined_output or "Http(503" in combined_output
+    )
+
+
+def wait_for_kanidm_auth_ready(
+    kanidm_exec: str,
+    env: dict[str, str],
+    *,
+    timeout: float = KANIDM_AUTH_READY_TIMEOUT_S,
+    interval: float = KANIDM_AUTH_POLL_INTERVAL_S,
+) -> None:
+    """Poll until /status is true and kanidm login is not rejected with HTTP 503."""
+    status_url = f"{env['KANIDM_URL'].rstrip('/')}/status"
+    ca_bundle = _resolve_ca_bundle(env)
+    deadline = time.monotonic() + timeout
+    last_login_error = ""
+
+    while time.monotonic() < deadline:
+        if not _status_online(status_url, ca_bundle):
+            time.sleep(interval)
+            continue
+
+        probe = subprocess.run(
+            [kanidm_exec, "login"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode == 0:
+            return
+
+        combined = f"{probe.stderr or ''}{probe.stdout or ''}"
+        if _login_transient_503(combined):
+            last_login_error = combined.strip()
+            time.sleep(interval)
+            continue
+
+        raise AssertionError(
+            f"kanidm login failed while waiting for auth readiness: {combined.strip()}"
+        )
+
+    detail = last_login_error or "GET /status never reported ready=true"
+    raise AssertionError(
+        f"Kanidm auth endpoint not ready after {timeout}s ({detail})"
+    )
 
 
 def kubectl(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -64,19 +154,28 @@ class KanidmVerifier:
         if ca_path:
             base_env["KANIDM_CA_PATH"] = ca_path
         self.env, self._kanidm_cli_cache = isolated_kanidm_cli_env(base_env)
+        wait_for_kanidm_auth_ready(self.kanidm_exec, self.env)
         self._login()
 
     def _login(self) -> None:
-        result = subprocess.run(
-            [self.kanidm_exec, "login"],
-            env=self.env,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise AssertionError(
-                f"kanidm login failed: {result.stderr.strip() or result.stdout.strip()}"
+        last_combined = ""
+        for attempt in range(1, KANIDM_LOGIN_503_RETRIES + 1):
+            result = subprocess.run(
+                [self.kanidm_exec, "login"],
+                env=self.env,
+                capture_output=True,
+                text=True,
             )
+            if result.returncode == 0:
+                return
+            last_combined = f"{result.stderr or ''}{result.stdout or ''}".strip()
+            if attempt < KANIDM_LOGIN_503_RETRIES and _login_transient_503(
+                last_combined
+            ):
+                time.sleep(KANIDM_AUTH_POLL_INTERVAL_S)
+                continue
+            break
+        raise AssertionError(f"kanidm login failed: {last_combined}")
 
     def kanidm(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(

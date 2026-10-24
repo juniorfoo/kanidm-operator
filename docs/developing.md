@@ -6,7 +6,7 @@ You need:
 
 - A Kubernetes cluster and kubeconfig
 - Network access to the Kanidm HTTPS endpoint (for example via ingress and `/etc/hosts`)
-- The `kanidm` CLI matching your server version
+- The `kanidm` CLI matching your server version (`bash scripts/install-kanidm-cli.sh` — see [Running tests locally](upgrading/kanidm-1.10.md#running-tests-locally))
 
 Install Python dependencies:
 

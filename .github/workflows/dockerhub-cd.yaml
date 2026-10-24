@@ -70,24 +70,17 @@ jobs:
           poetry env use 3.11
       - name: Install the operator python dependencies
         run: poetry install --no-root --with dev
-      ####  Here's an install of kanidm tools from cargo, but its waayyy too slow (3m30)
-      #- name: Setup rust to install kanidm CLI for the operator
-      #  uses: hecrj/setup-rust-action@v2
-      #- name: Install dependencies for kanidm CLI tool
-      #  run: sudo apt-get install libudev-dev
-      #- name: Install kanidm cli tool for use by the operator
-      #  run: |
-      #    cargo install kanidm_tools@=1.2.2
-      #### Much faster install, but they haven't got stable releases yet so may cause an issue
-      - name: Install kanidm from the PPA
+      - name: Install kanidm CLI (pinned to e2e server version)
         run: |
-          curl -s "https://kanidm.github.io/kanidm_ppa/kanidm_ppa.asc" \
-            | sudo tee /etc/apt/trusted.gpg.d/kanidm_ppa.asc >/dev/null
-          curl -s --compressed "https://kanidm.github.io/kanidm_ppa/kanidm_ppa.list" \
-            | grep $( ( . /etc/os-release && echo $VERSION_CODENAME) ) | grep stable \
-            | sudo tee /etc/apt/sources.list.d/kanidm_ppa.list
-          sudo apt-get update
-          sudo apt-get install -y kanidm
+          KANIDM_SERVER_VERSION="$(python -c 'from tests.helpers import KANIDM_VERSION; print(KANIDM_VERSION)')"
+          bash scripts/install-kanidm-cli.sh "${KANIDM_SERVER_VERSION}"
+          "${KANIDM_EXEC}" --version
+          DEPLOYED_MM="$(echo "${KANIDM_SERVER_VERSION}" | awk -F. '{print $1"."$2}')"
+          CLI_MM="$("${KANIDM_EXEC}" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | awk -F. '{print $1"."$2}')"
+          if [[ "${CLI_MM}" != "${DEPLOYED_MM}" ]]; then
+            echo "ERROR: kanidm CLI major.minor ${CLI_MM} does not match server ${DEPLOYED_MM} (${KANIDM_SERVER_VERSION})" >&2
+            exit 1
+          fi
 
       ##################   Run the tests   ##################
       - name: Run the automated tests
