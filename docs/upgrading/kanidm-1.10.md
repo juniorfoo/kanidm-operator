@@ -78,7 +78,7 @@ The e2e test mirrors CI: KIND cluster, ingress-nginx, cert-manager, and a self-s
 
 ### Install the Kanidm CLI (matches CI)
 
-The Kanidm CLI **must** match the server minor version (1.10.x). CI and local e2e tests install the binary from the `kanidm/tools` container image at the same tag as `KANIDM_VERSION` in `tests/helpers.py` (not the rolling PPA `stable` package):
+The Kanidm CLI **must** match the server minor version (1.10.x). CI and local e2e tests install a **pinned** `kanidm` Debian package from the Kanidm PPA at the same version as `KANIDM_VERSION` in `tests/helpers.py` (not an unpinned `apt install kanidm`, which tracks `stable` and may be a newer minor):
 
 ```bash
 bash scripts/install-kanidm-cli.sh
