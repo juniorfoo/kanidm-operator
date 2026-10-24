@@ -53,7 +53,11 @@ def _status_online(status_url: str, ca_bundle: str | None) -> bool:
             payload = json.loads(response.read().decode("utf-8"))
     except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
         return False
-    return payload.get("status") is True
+    if isinstance(payload, bool):
+        return payload
+    if isinstance(payload, dict):
+        return payload.get("status") is True
+    return False
 
 
 def _login_transient_503(combined_output: str) -> bool:
