@@ -25,7 +25,7 @@ Fresh installs can set `spec.version: 1.10.5` directly.
 
 ## Patch releases within 1.10
 
-Patch upgrades (for example 1.10.3 → 1.10.5) do not require operator code changes beyond version pins. Update the `Kanidm` CR `spec.version` and roll the server deployment.
+Patch upgrades (for example 1.10.3 → 1.10.5) do not require operator code changes beyond version pins. Update the `Kanidm` CR `spec.version`; **kanidm-operator 1.10.5-op.2+** reconciles the server `Deployment` image and related labels automatically (single-instance mode). The Deployment uses a **Recreate** strategy because Kanidm mounts a ReadWriteOnce volume. Downgrades and skipping minor versions are rejected.
 
 | Release | Notes |
 |---------|--------|
@@ -133,8 +133,10 @@ poetry run pytest -v
 |-------|------------------|
 | `test_server_config.py` | Config version 2, proxy settings, password parsing |
 | `test_kanidm_operator.py` | Full lifecycle: K8s resources, HTTPS, Kanidm user/group/OAuth2 state, secret contents |
+| `test_kanidm_version_upgrade.py` | Patch `spec.version` (1.10.3 → 1.10.5) rolls the server Deployment |
+| `test_kanidm_version.py` | Unit tests for upgrade policy validation |
 
-The e2e test does not yet cover update/delete flows or the Grafana OAuth2 example manifest.
+The e2e suite does not yet cover delete flows or the Grafana OAuth2 example manifest. High-availability mode is not reconciled on update (same as create).
 
 ## CI
 

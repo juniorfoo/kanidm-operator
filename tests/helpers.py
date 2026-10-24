@@ -143,11 +143,18 @@ class KanidmVerifier:
         assert stored_client_id == client_name
 
 
-def assert_kanidm_deployment() -> None:
+def assert_kanidm_deployment(version: str = KANIDM_VERSION) -> None:
     deployment = kubectl_json("get", "deployment", "kanidm", "-n", KANIDM_NAMESPACE)
     container = deployment["spec"]["template"]["spec"]["containers"][0]
-    assert container["image"] == f"kanidm/server:{KANIDM_VERSION}"
+    assert container["image"] == f"kanidm/server:{version}"
     assert deployment["status"].get("readyReplicas") == 1
+    assert deployment["spec"]["strategy"]["type"] == "Recreate"
+
+
+def deployment_image_version() -> str:
+    deployment = kubectl_json("get", "deployment", "kanidm", "-n", KANIDM_NAMESPACE)
+    image = deployment["spec"]["template"]["spec"]["containers"][0]["image"]
+    return image.split(":", 1)[1]
 
 
 def assert_kanidm_configmap() -> None:
