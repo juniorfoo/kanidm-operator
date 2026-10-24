@@ -1,7 +1,7 @@
 # noqa: F401,W0611
 # pylint: disable=unused-import
 
-from .deploy.kanidm import on_create_kanidms, on_update_kanidms  # noqa
+from .deploy.kanidm import on_create_kanidms, on_resume_kanidms, on_update_kanidms  # noqa
 from .deploy.group import (
     on_create_group,
     #on_update_group_name,

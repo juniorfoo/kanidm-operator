@@ -87,9 +87,9 @@ Images are built and pushed to Docker Hub by [`.github/workflows/dockerhub-cd.ya
 | Trigger | Image |
 |---------|-------|
 | Push to `master` | `juniorfoo/kanidm-operator:latest` (and branch/SHA tags) |
-| Git tag `v1.10.5-op.1` | `juniorfoo/kanidm-operator:1.10.5-op.1` |
+| Git tag `v1.10.5-op.2` | `juniorfoo/kanidm-operator:1.10.5-op.2` |
 
-The operator version in `pyproject.toml` (for example `1.10.5+1`) tracks the supported Kanidm release. Tag git releases as `v1.10.5-op.1` for Docker-friendly version tags.
+The operator version in `pyproject.toml` (for example `1.10.5+2`) tracks the supported Kanidm release. Tag git releases as `v1.10.5-op.2` for Docker-friendly version tags.
 
 To cut a release:
 

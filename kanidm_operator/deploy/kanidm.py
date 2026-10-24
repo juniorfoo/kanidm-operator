@@ -6,18 +6,27 @@ Will read the kanidms.kanidm.github.io CRD to deploy either:
 """
 
 import re
-import json
-from logging import Logger
 import time
+from logging import Logger
 
+import kopf
 from kubernetes import client
+import kubernetes.client.exceptions as k8s_exceptions
 from kubernetes.client.models.v1_pod import V1Pod
 from kubernetes.client.models.v1_pod_status import V1PodStatus
-import kopf
+from kubernetes.stream import stream
 
+from kanidm_operator.deploy.version import (
+    KanidmVersion,
+    VersionUpgradeError,
+    parse_server_image,
+    validate_version_upgrade,
+)
 from kanidm_operator.deployer import Deployer
 from kanidm_operator.typing.kanidm import KanidmResource
-from kubernetes.stream import stream
+
+KANIDM_DEPLOYMENT_NAME = "kanidm"
+
 
 def parse_recover_account_password(output: str) -> str | None:
     """Extract a recovered password from kanidmd output (JSON or log format)."""
@@ -31,24 +40,9 @@ def parse_recover_account_password(output: str) -> str | None:
 
     return None
 
-@kopf.on.create("kanidm.github.io", "v1alpha1", "kanidms")
-async def on_create_kanidms(
-    spec: KanidmResource,
-    name: str,
-    namespace: str,
-    logger: Logger,
-    patch: dict,
-    **kwargs,
-):
-    logger.info(f"Creating kanidm instance {name} in namespace {namespace}")
-    deployer = Deployer(namespace, spec["version"], logger)
 
-    deployer.deploy(
-        "certificate.yaml",
-        hostname=spec["domain"],
-        certificate_issuer=spec["certificate"]["issuer"],
-        version=spec["version"],
-    )
+def deploy_kanidm_static_resources(deployer: Deployer, spec: KanidmResource) -> None:
+    """Create PVCs and other resources that should only be applied on initial create."""
     deployer.deploy(
         "pvc-backups.yaml",
         backup_storage_class=spec["backup"]["storageClass"],
@@ -62,6 +56,53 @@ async def on_create_kanidms(
         db_storage_size=spec["database"]["storageSize"],
         db_storage_annotations=spec["database"].get("storageAnnotations", {}),
         db_storage_labels=spec["database"].get("storageLabels", {}),
+    )
+
+
+def deploy_kanidm_version_drift_resources(deployer: Deployer, spec: KanidmResource) -> None:
+    """
+    Patch only resources required to align a running server with spec.version.
+
+    Used on operator resume when kopf's last-handled-configuration already matches
+    the CR but the Deployment image drifted (for example after a no-op update handler).
+    Re-rendering Certificate/Service/Ingress on resume is avoided: those objects are
+    unchanged when only the server tag drifts, and a full reconcile could apply
+    unrelated template churn for clusters created by older operator builds.
+    """
+    deployer.deploy(
+        "server.toml",
+        domain=spec["domain"],
+        log_level=spec.get("logLevel", "info"),
+        ldap_port=spec.get("ldapPort", "3890"),
+        http_port=spec.get("webPort", "8443"),
+        db_fs_type=spec["database"]["fsType"],
+        db_arc_size=spec["database"]["arcSize"],
+        backup_enabled=spec["backup"]["enabled"],
+        backup_schedule=spec["backup"]["schedule"],
+        backup_versions=spec["backup"]["versions"],
+        trust_x_forwarded_for=spec["ingress"]["trustXForwardedFor"],
+    )
+
+    if not spec["highAvailability"]["enabled"]:
+        deployer.deploy(
+            "deployment.yaml",
+            http_port=spec.get("webPort", "8443"),
+            ldap_port=spec.get("ldapPort", "3890"),
+            image=f"kanidm/server:{spec['version']}",
+        )
+    else:
+        deployer.logger.warning(
+            "highAvailability mode is not implemented; skipping Deployment drift reconcile"
+        )
+
+
+def deploy_kanidm_reconciled_resources(deployer: Deployer, spec: KanidmResource) -> None:
+    """Render and patch operator-managed Kanidm resources from the CR spec."""
+    deployer.deploy(
+        "certificate.yaml",
+        hostname=spec["domain"],
+        certificate_issuer=spec["certificate"]["issuer"],
+        version=spec["version"],
     )
     deployer.deploy(
         "service.yaml",
@@ -89,7 +130,10 @@ async def on_create_kanidms(
             ldap_port=spec.get("ldapPort", "3890"),
             image=f"kanidm/server:{spec['version']}",
         )
-    # TODO: Handle HighAvailability mode
+    else:
+        deployer.logger.warning(
+            "highAvailability mode is not implemented; skipping Deployment reconcile"
+        )
 
     if spec.get("ingress").get("enabled", False):
         deployer.deploy(
@@ -97,10 +141,103 @@ async def on_create_kanidms(
             hostname=spec["domain"],
             http_port=spec["webPort"],
             ingress_class_name=spec["ingress"].get("ingressClassName", "nginx"),
-            annotations={} if "annotations" not in spec["ingress"] else spec["ingress"]["annotations"],
+            annotations={}
+            if "annotations" not in spec["ingress"]
+            else spec["ingress"]["annotations"],
         )
 
-    logger.info(f"All k8s resources for kanidm {name} have been deployed, waiting for pod to be ready")
+
+def spec_needs_reconcile(old_spec: KanidmResource, new_spec: KanidmResource) -> bool:
+    """Return True when a spec change should re-render reconciled child resources."""
+    reconcile_keys = (
+        "version",
+        "domain",
+        "logLevel",
+        "webPort",
+        "ldapPort",
+        "database",
+        "backup",
+        "certificate",
+        "ingress",
+        "highAvailability",
+    )
+    for key in reconcile_keys:
+        if old_spec.get(key) != new_spec.get(key):
+            return True
+    return False
+
+
+def deployment_version_drifts_from_spec(namespace: str, spec_version: str) -> bool:
+    """Return True when the live Deployment image tag differs from spec.version."""
+    image = get_deployed_server_image(namespace)
+    if image is None:
+        return False
+    try:
+        deployed = parse_server_image(image)
+        target = KanidmVersion.parse(spec_version)
+    except ValueError:
+        return True
+    return deployed != target
+
+
+def get_deployed_server_image(namespace: str) -> str | None:
+    apps = client.AppsV1Api()
+    try:
+        deployment = apps.read_namespaced_deployment(KANIDM_DEPLOYMENT_NAME, namespace)
+    except k8s_exceptions.ApiException as exc:
+        if exc.status == 404:
+            return None
+        raise
+    containers = deployment.spec.template.spec.containers
+    if not containers:
+        return None
+    return containers[0].image
+
+
+def validate_spec_version_upgrade(
+    namespace: str,
+    target_version: str,
+    logger: Logger,
+) -> None:
+    image = get_deployed_server_image(namespace)
+    if image is None:
+        logger.info("No kanidm Deployment found; skipping version upgrade validation")
+        return
+    try:
+        current = parse_server_image(image)
+    except ValueError as exc:
+        logger.error("Cannot parse deployed kanidm image %s: %s", image, exc)
+        raise kopf.PermanentError(str(exc)) from exc
+    try:
+        target = parse_server_image(f"kanidm/server:{target_version}")
+    except ValueError as exc:
+        logger.error("Invalid spec.version %s: %s", target_version, exc)
+        raise kopf.PermanentError(str(exc)) from exc
+    try:
+        validate_version_upgrade(current, target)
+    except VersionUpgradeError as exc:
+        logger.error("%s", exc)
+        raise kopf.PermanentError(str(exc)) from exc
+
+
+@kopf.on.create("kanidm.github.io", "v1alpha1", "kanidms")
+async def on_create_kanidms(
+    spec: KanidmResource,
+    name: str,
+    namespace: str,
+    logger: Logger,
+    patch: dict,
+    **kwargs,
+):
+    logger.info(f"Creating kanidm instance {name} in namespace {namespace}")
+    deployer = Deployer(namespace, spec["version"], logger)
+
+    deploy_kanidm_static_resources(deployer, spec)
+    deploy_kanidm_reconciled_resources(deployer, spec)
+
+    logger.info(
+        f"All k8s resources for kanidm {name} have been deployed, waiting for pod to be ready"
+    )
     done = False
     core = client.CoreV1Api()
     while not done:
@@ -108,7 +245,7 @@ async def on_create_kanidms(
             namespace,
             label_selector="app.kubernetes.io/name=kanidm",
         ).items
-        
+
         if len(pods) == 0:
             logger.info(f"Waiting for kanidm {name} pod to be created")
             time.sleep(5)
@@ -118,36 +255,46 @@ async def on_create_kanidms(
         status: V1PodStatus = pod.status
 
         if status.phase != "Running":
-            logger.info(f"Waiting for kanidm {name} pod to be ready, current status: {status.phase}")
+            logger.info(
+                f"Waiting for kanidm {name} pod to be ready, current status: {status.phase}"
+            )
             time.sleep(5)
             continue
 
         logger.info("Kanidm pod is running, trying to fetch admin and idm_admin passwords")
-        
-        resp = stream(core.connect_get_namespaced_pod_exec,
-                pod.metadata.name,
-                namespace,
-                container="kanidm",
-                command=["kanidmd", "recover-account", "admin"],
-                stderr=False, stdin=False, stdout=True, tty=False,
-            )
+
+        resp = stream(
+            core.connect_get_namespaced_pod_exec,
+            pod.metadata.name,
+            namespace,
+            container="kanidm",
+            command=["kanidmd", "recover-account", "admin"],
+            stderr=False,
+            stdin=False,
+            stdout=True,
+            tty=False,
+        )
         admin_password = parse_recover_account_password(resp)
         if admin_password is None:
-            logger.info(f"Failed to parse admin password, perhaps kanidm is still booting? Retrying")
-            # If kanidm has not booted yet, then the socket will not be available, so wait a bit
+            logger.info(
+                "Failed to parse admin password, perhaps kanidm is still booting? Retrying"
+            )
             time.sleep(2)
             continue
-        resp = stream(core.connect_get_namespaced_pod_exec,
-                pod.metadata.name,
-                namespace,
-                container="kanidm",
-                command=["kanidmd", "recover-account", "idm_admin"],
-                stderr=False, stdin=False, stdout=True, tty=False,
+        resp = stream(
+            core.connect_get_namespaced_pod_exec,
+            pod.metadata.name,
+            namespace,
+            container="kanidm",
+            command=["kanidmd", "recover-account", "idm_admin"],
+            stderr=False,
+            stdin=False,
+            stdout=True,
+            tty=False,
         )
         idm_admin_password = parse_recover_account_password(resp)
         if idm_admin_password is None:
-            logger.warning(f"Failed to parse idm_admin password, this should not happen!")
-            # If kanidm has not booted yet, then the socket will not be available, so wait a bit
+            logger.warning("Failed to parse idm_admin password, this should not happen!")
             time.sleep(2)
             continue
         deployer.deploy(
@@ -162,15 +309,53 @@ async def on_create_kanidms(
         )
         logger.info("Kanidm admin and idm_admin passwords have been fetched and stored in secrets")
         done = True
-    
-    patch.setdefault("metadata", {}).setdefault("annotations", {})["kanidm.github.io/processed"] = "true"
+
+    patch.setdefault("metadata", {}).setdefault("annotations", {})[
+        "kanidm.github.io/processed"
+    ] = "true"
+
 
 @kopf.on.update("kanidm.github.io", "v1alpha1", "kanidms")
 async def on_update_kanidms(
+    spec: KanidmResource,
+    old: dict,
+    name: str,
+    namespace: str,
+    logger: Logger,
+    **kwargs,
+):
+    old_spec = old.get("spec", {})
+    if not spec_needs_reconcile(old_spec, spec):
+        logger.debug("Kanidm spec change does not require workload reconcile; skipping")
+        return
+
+    if old_spec.get("version") != spec.get("version"):
+        validate_spec_version_upgrade(namespace, spec["version"], logger)
+
+    logger.info(f"Reconciling kanidm instance {name} in namespace {namespace}")
+    deployer = Deployer(namespace, spec["version"], logger)
+    deploy_kanidm_reconciled_resources(deployer, spec)
+
+
+@kopf.on.resume("kanidm.github.io", "v1alpha1", "kanidms")
+async def on_resume_kanidms(
     spec: KanidmResource,
     name: str,
     namespace: str,
     logger: Logger,
     **kwargs,
 ):
-    pass
+    if not deployment_version_drifts_from_spec(namespace, spec["version"]):
+        logger.debug(
+            "Kanidm Deployment image matches spec.version on resume; skipping drift reconcile"
+        )
+        return
+
+    logger.info(
+        "Kanidm Deployment image drifts from spec.version on resume for %s/%s",
+        namespace,
+        name,
+    )
+    validate_spec_version_upgrade(namespace, spec["version"], logger)
+    deployer = Deployer(namespace, spec["version"], logger)
+    deploy_kanidm_version_drift_resources(deployer, spec)

@@ -1,0 +1,35 @@
+---
+apiVersion: kanidm.github.io/v1alpha1
+kind: Kanidm
+metadata:
+  name: kanidm-instance
+  namespace: kanidm
+spec:
+  version: 1.10.3
+  database:
+    fsType: other
+    storageClass: standard
+    arcSize: 2048
+    storageSize: 1Gi
+  domain: idm.example.com
+  certificate:
+    issuer: letsencrypt-prod
+  logLevel: info
+  backup:
+    enabled: true
+    schedule: "0 9 * * *"
+    versions: 7
+    storageClass: standard
+    storageSize: 7Gi
+  webPort: 8443
+  ldapPort: 3890
+  highAvailability:
+    enabled: false
+    replicas: 1
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    trustXForwardedFor: true
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+      cert-manager.io/cluster-issuer: letsencrypt-prod
