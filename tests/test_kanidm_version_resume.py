@@ -6,9 +6,11 @@ import pytest
 
 from tests.helpers import (
     KANIDM_NAMESPACE,
+    assert_kanidm_cr_status,
     assert_kanidm_deployment,
     deployment_image_version,
     kubectl,
+    stamp_kopf_failure_annotation,
     stamp_kopf_last_handled_configuration,
     wait_processed,
 )
@@ -84,6 +86,10 @@ def test_resume_heals_version_drift_with_stale_last_handled():
         '{"spec":{"version":"1.10.5"}}',
     )
     stamp_kopf_last_handled_configuration("kanidm", "kanidm-instance")
+    stamp_kopf_failure_annotation(
+        "on_update_kanidms",
+        "422 Client Error: Unprocessable Entity for url: .../deployments/kanidm",
+    )
     assert deployment_image_version() == "1.10.3"
 
     with kopf.testing.KopfRunner(
@@ -110,6 +116,7 @@ def test_resume_heals_version_drift_with_stale_last_handled():
             "--timeout=300s",
         )
         assert_kanidm_deployment(version="1.10.5")
+        assert_kanidm_cr_status(version="1.10.5")
 
     assert resume_runner.exception is None
     assert resume_runner.exit_code == 0

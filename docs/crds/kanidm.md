@@ -53,15 +53,30 @@ spec:
 
 ## Status
 
-When provisioning completes, the operator sets:
+The `Kanidm` CR exposes a `.status` subresource. The operator updates it on every create, update, and resume reconcile with the live server image, replica counts, and standard conditions:
 
 ```yaml
-metadata:
-  annotations:
-    kanidm.github.io/processed: "true"
+status:
+  observedGeneration: 1
+  version: 1.10.5
+  image: kanidm/server:1.10.5
+  readyReplicas: 1
+  availableReplicas: 1
+  lastReconcileTime: "2026-10-24T12:00:00Z"
+  lastReconcileResult: Success
+  lastReconcileTrigger: create
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: ReconcileSuccessful
+    - type: Degraded
+      status: "False"
+      reason: NotDegraded
 ```
 
-It also creates `admin-credentials` and `idm-admin-credentials` secrets in the Kanidm namespace.
+When provisioning completes, the operator also sets `metadata.annotations.kanidm.github.io/processed: "true"` and creates `admin-credentials` and `idm-admin-credentials` secrets in the Kanidm namespace.
+
+Kopf handler progress is stored under `status.kopf` (not in annotations), so stale failure annotations from older operator builds are cleared after a successful reconcile.
 
 ## Example
 

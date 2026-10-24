@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.10.5-op.5 (unreleased)
+## 1.10.5-op.6 (unreleased)
+
+- Populate the `Kanidm` CR `.status` subresource on create, update, and resume with observed server version/image, Deployment replica counts, `Ready`/`Degraded` conditions, and last reconcile metadata; clear legacy kopf progress annotations after a successful reconcile.
+- Enable the `Kanidm` CRD status subresource and grant the operator `get`/`patch` on `kanidms/status` (homelab-cluster must ship the matching CRD and ClusterRole change).
+
+## 1.10.5-op.5
+
+Released 2026-10-24.
 
 - Isolate kanidm CLI token cache per `KanidmCLIClient` / test verifier subprocess (`HOME` override) so concurrent `kanidm login` no longer corrupts `~/.cache/kanidm_tokens` during e2e reconciliation.
 - Pin the Kanidm CLI in CI to the e2e server image version (`scripts/install-kanidm-cli.sh`, PPA package pin) instead of an unpinned PPA `stable` install; fail when CLI major.minor does not match the server.

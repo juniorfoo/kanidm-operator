@@ -11,6 +11,19 @@ from kanidm_operator.deploy.kanidm import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _mock_deployment_replica_status():
+    with patch(
+        "kanidm_operator.deploy.kanidm_status.get_deployment_replica_status",
+        return_value={
+            "image": "kanidm/server:1.10.5",
+            "readyReplicas": 1,
+            "availableReplicas": 1,
+        },
+    ):
+        yield
+
+
 def test_spec_needs_reconcile_detects_version_change() -> None:
     old = {"version": "1.10.3", "webPort": 8443}
     new = {"version": "1.10.5", "webPort": 8443}
@@ -48,6 +61,8 @@ def test_on_update_skips_when_spec_unchanged() -> None:
                 name="kanidm-instance",
                 namespace="kanidm",
                 logger=logger,
+                patch={},
+                meta={"generation": 1},
             )
             reconcile.assert_not_called()
 
