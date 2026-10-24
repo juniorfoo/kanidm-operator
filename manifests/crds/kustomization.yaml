@@ -17,5 +17,5 @@ labels:
       app.kubernetes.io/managed-by: kustomize
       app.kubernetes.io/component: kanidm-operator-crds
       app.kubernetes.io/part-of: kanidm
-      app.kubernetes.io/version: 1.10.5-op.3
+      app.kubernetes.io/version: 1.10.5-op.4
     includeSelectors: false

@@ -1,4 +1,5 @@
 from base64 import b64encode
+from copy import deepcopy
 from typing import Any, Callable
 from logging import Logger
 
@@ -22,6 +23,28 @@ def b64enc(value: Any, encoding="utf-8") -> str:
 
 def slugify(value: str) -> str:
     return value.lower().replace(" ", "-").replace("_", "-")
+
+
+def prepare_deployment_patch_body(body: dict[str, Any]) -> dict[str, Any]:
+    """
+    Build a strategic-merge patch body for Deployments.
+
+    When the template sets strategy.type to Recreate, a strategic merge against a
+    Deployment that still has rollingUpdate from older operator builds must clear
+    rollingUpdate explicitly or the API rejects the patch (422).
+    """
+    spec = body.get("spec")
+    if not isinstance(spec, dict):
+        return body
+    strategy = spec.get("strategy")
+    if not isinstance(strategy, dict) or strategy.get("type") != "Recreate":
+        return body
+
+    patched = deepcopy(body)
+    patched_strategy = dict(patched["spec"]["strategy"])
+    patched_strategy["rollingUpdate"] = None
+    patched["spec"]["strategy"] = patched_strategy
+    return patched
 
 
 class Deployer:
@@ -68,8 +91,15 @@ class Deployer:
                     #self.logger.debug(f"kwargs is {repr(kwargs)}.")
                     # Try a patch instead
                     method_name = method_name.replace("create", "patch")
+                    if method_name == "patch_namespaced_deployment":
+                        body = prepare_deployment_patch_body(body)
                     method = getattr(api, method_name)
-                    return method(name=body['metadata']['name'], namespace=namespace, body=body, **kwargs)
+                    return method(
+                        name=body["metadata"]["name"],
+                        namespace=namespace,
+                        body=body,
+                        **kwargs,
+                    )
                 else:
                     self.logger.warning(f"Calling {method_name} and object already exists.")
 

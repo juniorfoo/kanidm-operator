@@ -135,6 +135,8 @@ poetry run pytest -v
 | `test_kanidm_operator.py` | Full lifecycle: K8s resources, HTTPS, Kanidm user/group/OAuth2 state, secret contents |
 | `test_kanidm_version_upgrade.py` | Patch `spec.version` (1.10.3 → 1.10.5) rolls the server Deployment |
 | `test_kanidm_version_resume.py` | Resume heals drift when CR/kopf state is 1.10.5 but Deployment is 1.10.3 |
+| `test_kanidm_deployment_strategy_migrate.py` | Legacy `RollingUpdate` Deployments patch to `Recreate` without stale `rollingUpdate` on version roll |
+| `test_deployer_deployment_patch.py` | Unit tests for Deployment strategic-merge patch body |
 | `test_kanidm_version.py` | Unit tests for upgrade policy validation |
 | `test_operator_rbac.py` | Operator ServiceAccount vs shipped ClusterRole (`kubectl auth can-i`) |
 
