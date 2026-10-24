@@ -11,6 +11,7 @@ import yaml
 from tests.helpers import KANIDM_NAMESPACE, kubectl
 
 OPERATOR_KUSTOMIZE = Path(__file__).resolve().parents[1] / "manifests" / "operator"
+CRD_KUSTOMIZE = Path(__file__).resolve().parents[1] / "manifests" / "crds"
 CLUSTER_ROLE_PATH = OPERATOR_KUSTOMIZE / "cluster-role.yaml"
 OPERATOR_SA = "system:serviceaccount:kanidm-system:kanidm-operator-account"
 
@@ -39,7 +40,7 @@ def _auth_can_i_args(api_group: str, resource: str, verb: str) -> list[str]:
     args = ["auth", "can-i", verb, f"--as={OPERATOR_SA}"]
     if resource.endswith("/status"):
         plural = resource.removesuffix("/status")
-        args.extend([plural, f"--api-group={api_group}", "--subresource=status"])
+        args.extend([_resource_for_can_i(api_group, plural), "--subresource=status"])
     else:
         args.append(_resource_for_can_i(api_group, resource))
     if (api_group, resource) not in _CLUSTER_SCOPED:
@@ -81,7 +82,11 @@ def test_operator_service_account_can_use_shipped_cluster_role(
 ):
     """Each verb in manifests/operator/cluster-role.yaml must be allowed for the operator SA."""
     args = _auth_can_i_args(api_group, resource, verb)
-    resource_name = args[3] if resource.endswith("/status") else args[3]
+    resource_name = (
+        f"{resource.removesuffix('/status')}/status"
+        if resource.endswith("/status")
+        else _resource_for_can_i(api_group, resource)
+    )
     result = kubectl(*args, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "yes", (

@@ -3,7 +3,7 @@
 ## 1.10.5-op.6 (unreleased)
 
 - Populate the `Kanidm` CR `.status` subresource on create, update, and resume with observed server version/image, Deployment replica counts, `Ready`/`Degraded` conditions, and last reconcile metadata; clear legacy kopf progress annotations after a successful reconcile.
-- Enable the `Kanidm` CRD status subresource and grant the operator `get`/`patch`/`update` on `kanidms/status` (homelab-cluster must ship the matching CRD and ClusterRole change).
+- Enable the `Kanidm` CRD status subresource and grant the operator `get`/`patch` on `kanidms/status` (homelab-cluster must ship the matching CRD and ClusterRole change).
 
 ## 1.10.5-op.5
 

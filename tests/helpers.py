@@ -133,20 +133,35 @@ def assert_kanidm_cr_status(
     *,
     ready: bool = True,
     reconcile_result: str = "Success",
+    timeout: float = 120.0,
+    interval: float = 2.0,
 ) -> None:
     """Assert the Kanidm CR status reflects a reconciled server."""
-    cr = kubectl_json("get", "kanidm", "kanidm-instance", "-n", KANIDM_NAMESPACE)
-    status = cr.get("status") or {}
-    assert status.get("version") == version, status
-    assert status.get("image") == f"kanidm/server:{version}", status
-    assert status.get("lastReconcileResult") == reconcile_result, status
-    conditions = {item["type"]: item for item in status.get("conditions", [])}
-    assert conditions["Ready"]["status"] == ("True" if ready else "False"), conditions
-    assert conditions["Degraded"]["status"] == ("False" if ready else "True"), conditions
-    annotations = cr.get("metadata", {}).get("annotations", {})
-    for key, value in annotations.items():
-        if key.startswith("kopf.zalando.org/") and value:
-            assert "422" not in value, f"stale kopf annotation {key}: {value}"
+    deadline = time.monotonic() + timeout
+    last_error: AssertionError | None = None
+    while time.monotonic() < deadline:
+        try:
+            cr = kubectl_json("get", "kanidm", "kanidm-instance", "-n", KANIDM_NAMESPACE)
+            status = cr.get("status") or {}
+            assert status.get("version") == version, status
+            assert status.get("image") == f"kanidm/server:{version}", status
+            assert status.get("lastReconcileResult") == reconcile_result, status
+            conditions = {item["type"]: item for item in status.get("conditions", [])}
+            assert conditions["Ready"]["status"] == ("True" if ready else "False"), conditions
+            assert conditions["Degraded"]["status"] == (
+                "False" if ready else "True"
+            ), conditions
+            annotations = cr.get("metadata", {}).get("annotations", {})
+            for key, value in annotations.items():
+                if key.startswith("kopf.zalando.org/") and value:
+                    assert "422" not in value, f"stale kopf annotation {key}: {value}"
+            return
+        except AssertionError as exc:
+            last_error = exc
+            time.sleep(interval)
+    if last_error is not None:
+        raise last_error
+    raise AssertionError("Kanidm CR status was not populated")
 
 
 def wait_processed(resource: str, name: str, timeout: str = "180s") -> None:
