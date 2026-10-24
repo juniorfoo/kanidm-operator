@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import kopf
@@ -11,15 +10,24 @@ from kanidm_operator.deploy.kanidm import (
 )
 
 
+_DEPLOYMENT_STATUS = {
+    "image": "kanidm/server:1.10.5",
+    "readyReplicas": 1,
+    "availableReplicas": 1,
+}
+
+
 @pytest.fixture(autouse=True)
 def _mock_deployment_replica_status():
-    with patch(
-        "kanidm_operator.deploy.kanidm_status.get_deployment_replica_status",
-        return_value={
-            "image": "kanidm/server:1.10.5",
-            "readyReplicas": 1,
-            "availableReplicas": 1,
-        },
+    with (
+        patch(
+            "kanidm_operator.deploy.kanidm_status.get_deployment_replica_status",
+            return_value=_DEPLOYMENT_STATUS,
+        ),
+        patch(
+            "kanidm_operator.deploy.kanidm.get_deployment_replica_status",
+            return_value=_DEPLOYMENT_STATUS,
+        ),
     ):
         yield
 
@@ -51,19 +59,16 @@ def test_on_update_skips_when_spec_unchanged() -> None:
     old = {"spec": spec}
     logger = MagicMock()
 
-    async def run() -> None:
-        with patch(
-            "kanidm_operator.deploy.kanidm.deploy_kanidm_reconciled_resources"
-        ) as reconcile:
-            await on_update_kanidms(
-                spec=spec,
-                old=old,
-                name="kanidm-instance",
-                namespace="kanidm",
-                logger=logger,
-                patch={},
-                meta={"generation": 1},
-            )
-            reconcile.assert_not_called()
-
-    asyncio.run(run())
+    with patch(
+        "kanidm_operator.deploy.kanidm.deploy_kanidm_reconciled_resources"
+    ) as reconcile:
+        on_update_kanidms(
+            spec=spec,
+            old=old,
+            name="kanidm-instance",
+            namespace="kanidm",
+            logger=logger,
+            patch={},
+            meta={"generation": 1},
+        )
+        reconcile.assert_not_called()

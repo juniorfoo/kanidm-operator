@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.5-op.7 (unreleased)
+
+- Run blocking Kanidm CLI and Kubernetes client work in Kopf's thread-pool executor (sync handlers) so the built-in `--liveness` server on `:8080/healthz` stays responsive during bulk User/Group/OAuth2 resume after a kopf persistence migration.
+- Cap concurrent dependent-resource reconciles and gate identity handlers on idm_admin credential secrets so Kanidm instance reconcile is not starved behind bulk replay on startup.
+- Enable `status` subresources (with `status.kopf` schema) on `User`, `Group`, and `OAuth2Client` CRDs and grant `get`/`patch` on `users/status`, `groups/status`, and `oauth2-clients/status` (homelab-cluster must ship the matching CRD and ClusterRole changes).
+
 ## 1.10.5-op.6 (unreleased)
 
 - Populate the `Kanidm` CR `.status` subresource on create, update, and resume with observed server version/image, Deployment replica counts, `Ready`/`Degraded` conditions, and last reconcile metadata; clear legacy kopf progress annotations after a successful reconcile.

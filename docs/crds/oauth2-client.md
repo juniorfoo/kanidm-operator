@@ -52,6 +52,8 @@ The operator creates `{spec.name}-oauth2-credentials` with:
 - `key` — client ID
 - `secret` — client secret from Kanidm
 
+Kopf handler progress is stored under `status.kopf` (requires the CRD `status` subresource).
+
 ## Examples
 
 - [`manifests/example/oauth2-client.yaml`](https://github.com/juniorfoo/kanidm-operator/blob/master/manifests/example/oauth2-client.yaml) — Forgejo

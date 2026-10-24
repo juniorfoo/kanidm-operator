@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import kopf
@@ -18,9 +17,15 @@ _DEPLOYMENT_STATUS = {
 
 @pytest.fixture(autouse=True)
 def _mock_deployment_replica_status():
-    with patch(
-        "kanidm_operator.deploy.kanidm_status.get_deployment_replica_status",
-        return_value=_DEPLOYMENT_STATUS,
+    with (
+        patch(
+            "kanidm_operator.deploy.kanidm_status.get_deployment_replica_status",
+            return_value=_DEPLOYMENT_STATUS,
+        ),
+        patch(
+            "kanidm_operator.deploy.kanidm.get_deployment_replica_status",
+            return_value=_DEPLOYMENT_STATUS,
+        ),
     ):
         yield
 
@@ -45,85 +50,74 @@ def test_on_resume_skips_without_drift() -> None:
     spec = {"version": "1.10.5"}
     logger = MagicMock()
 
-    async def run() -> None:
+    with patch(
+        "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
+        return_value=False,
+    ):
         with patch(
-            "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
-            return_value=False,
-        ):
-            with patch(
-                "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
-            ) as reconcile:
-                await on_resume_kanidms(
-                    spec=spec,
-                    name="kanidm-instance",
-                    namespace="kanidm",
-                    logger=logger,
-                    patch={},
-                    meta={"generation": 1},
-                )
-                reconcile.assert_not_called()
-
-    asyncio.run(run())
+            "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
+        ) as reconcile:
+            on_resume_kanidms(
+                spec=spec,
+                name="kanidm-instance",
+                namespace="kanidm",
+                logger=logger,
+                patch={},
+                meta={"generation": 1},
+            )
+            reconcile.assert_not_called()
 
 
 def test_on_resume_reconciles_drift() -> None:
     spec = {"version": "1.10.5", "highAvailability": {"enabled": False}}
     logger = MagicMock()
 
-    async def run() -> None:
+    with patch(
+        "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
+        return_value=True,
+    ):
         with patch(
-            "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
-            return_value=True,
-        ):
-            with patch(
-                "kanidm_operator.deploy.kanidm.validate_spec_version_upgrade"
-            ) as validate:
+            "kanidm_operator.deploy.kanidm.validate_spec_version_upgrade"
+        ) as validate:
+            with patch("kanidm_operator.deploy.kanidm.Deployer") as deployer_cls:
                 with patch(
-                    "kanidm_operator.deploy.kanidm.Deployer"
-                ) as deployer_cls:
-                    with patch(
-                        "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
-                    ) as reconcile:
-                        await on_resume_kanidms(
-                            spec=spec,
-                            name="kanidm-instance",
-                            namespace="kanidm",
-                            logger=logger,
-                            patch={},
-                            meta={"generation": 1},
-                        )
-                        validate.assert_called_once_with("kanidm", "1.10.5", logger)
-                        reconcile.assert_called_once()
-                        deployer_cls.assert_called_once_with("kanidm", "1.10.5", logger)
-
-    asyncio.run(run())
+                    "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
+                ) as reconcile:
+                    on_resume_kanidms(
+                        spec=spec,
+                        name="kanidm-instance",
+                        namespace="kanidm",
+                        logger=logger,
+                        patch={},
+                        meta={"generation": 1},
+                    )
+                    validate.assert_called_once_with("kanidm", "1.10.5", logger)
+                    reconcile.assert_called_once()
+                    deployer_cls.assert_called_once_with("kanidm", "1.10.5", logger)
 
 
 def test_on_resume_refuses_downgrade_drift() -> None:
     spec = {"version": "1.10.3"}
     logger = MagicMock()
 
-    async def run() -> None:
+    with patch(
+        "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
+        return_value=True,
+    ):
         with patch(
-            "kanidm_operator.deploy.kanidm.deployment_version_drifts_from_spec",
-            return_value=True,
+            "kanidm_operator.deploy.kanidm.validate_spec_version_upgrade",
+            side_effect=kopf.PermanentError("downgrade"),
         ):
             with patch(
-                "kanidm_operator.deploy.kanidm.validate_spec_version_upgrade",
-                side_effect=kopf.PermanentError("downgrade"),
-            ):
-                with patch(
-                    "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
-                ) as reconcile:
-                    with pytest.raises(kopf.PermanentError):
-                        await on_resume_kanidms(
-                            spec=spec,
-                            name="kanidm-instance",
-                            namespace="kanidm",
-                            logger=logger,
-                            patch={},
-                            meta={"generation": 1},
-                        )
-                    reconcile.assert_not_called()
-
-    asyncio.run(run())
+                "kanidm_operator.deploy.kanidm.deploy_kanidm_version_drift_resources"
+            ) as reconcile:
+                with pytest.raises(kopf.PermanentError):
+                    on_resume_kanidms(
+                        spec=spec,
+                        name="kanidm-instance",
+                        namespace="kanidm",
+                        logger=logger,
+                        patch={},
+                        meta={"generation": 1},
+                    )
+                reconcile.assert_not_called()

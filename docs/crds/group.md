@@ -25,6 +25,8 @@ spec:
 
 Updating `spec.members` triggers a reconcile that calls `kanidm group set-members`.
 
+Kopf handler progress is stored under `status.kopf` (requires the CRD `status` subresource).
+
 ## Example
 
 See [`manifests/example/groups.yaml`](https://github.com/juniorfoo/kanidm-operator/blob/master/manifests/example/groups.yaml).
