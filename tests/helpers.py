@@ -153,11 +153,12 @@ def assert_kanidm_deployment(version: str = KANIDM_VERSION) -> None:
 
 def stamp_kopf_last_handled_configuration(resource: str, name: str) -> None:
     """Make kopf believe the current CR body is already handled (Joe's drift scenario)."""
+    import kopf
     from kopf._cogs.configs.diffbase import AnnotationsDiffBaseStorage
 
     cr = kubectl_json("get", resource, name, "-n", KANIDM_NAMESPACE)
     storage = AnnotationsDiffBaseStorage()
-    essence = storage.build(body=cr)
+    essence = storage.build(body=kopf.Body(cr))
     encoded = json.dumps(essence, separators=(",", ":")) + "\n"
     annotation_key = "kopf.zalando.org/last-handled-configuration"
     kubectl(
