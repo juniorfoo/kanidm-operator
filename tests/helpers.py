@@ -148,7 +148,45 @@ def assert_kanidm_deployment(version: str = KANIDM_VERSION) -> None:
     container = deployment["spec"]["template"]["spec"]["containers"][0]
     assert container["image"] == f"kanidm/server:{version}"
     assert deployment["status"].get("readyReplicas") == 1
-    assert deployment["spec"]["strategy"]["type"] == "Recreate"
+    strategy = deployment["spec"]["strategy"]
+    assert strategy["type"] == "Recreate"
+    assert "rollingUpdate" not in strategy
+
+
+def stamp_legacy_rolling_update_deployment(image_tag: str = "1.10.3") -> None:
+    """Simulate Deployments created by pre-Recreate operator versions."""
+    kubectl(
+        "patch",
+        "deployment",
+        "kanidm",
+        "-n",
+        KANIDM_NAMESPACE,
+        "--type=strategic",
+        "-p",
+        json.dumps(
+            {
+                "spec": {
+                    "strategy": {
+                        "type": "RollingUpdate",
+                        "rollingUpdate": {
+                            "maxSurge": "25%",
+                            "maxUnavailable": "25%",
+                        },
+                    },
+                    "template": {
+                        "spec": {
+                            "containers": [
+                                {
+                                    "name": "kanidm",
+                                    "image": f"kanidm/server:{image_tag}",
+                                }
+                            ]
+                        }
+                    },
+                }
+            }
+        ),
+    )
 
 
 def stamp_kopf_last_handled_configuration(resource: str, name: str) -> None:

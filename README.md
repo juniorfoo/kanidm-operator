@@ -43,7 +43,7 @@ The operator is end-to-end tested using the definitions in the [`manifests/examp
 
 * First, a namespace must be created for the configuration objects. The example uses the
 [`kanidm`](manifests/example/namespace.yaml) namespace.
-* You next need to configure the deployment of kanidm [using a Kanidm CRD](manifests/example/kanidm.yaml). Changing `spec.version` on an existing instance rolls the server image when using operator **1.10.5-op.2** or newer (use **1.10.5-op.3** or newer for in-cluster installs so the operator can read Deployments) (patch releases within a minor, one minor at a time; no downgrades).
+* You next need to configure the deployment of kanidm [using a Kanidm CRD](manifests/example/kanidm.yaml). Changing `spec.version` on an existing instance rolls the server image when using operator **1.10.5-op.2** or newer (use **1.10.5-op.4** or newer when upgrading from pre-Recreate operator builds that left a `RollingUpdate` strategy on the server Deployment; **1.10.5-op.3**+ for in-cluster installs so the operator can read Deployments) (patch releases within a minor, one minor at a time; no downgrades).
 * Then you can [create users](manifests/example/users.yaml) or [create groups](manifests/example/groups.yaml) and any user members in them will be automatically created.
 * Finally, if you want to integrate an external application, you can create an [OAuth2 endpoint](manifests/example/oauth2-client.yaml); the example shows the configuration for Forgejo (community fork of Gitea).
 

@@ -1,6 +1,10 @@
 # Changelog
 
-## 1.10.5-op.3 (unreleased)
+## 1.10.5-op.4 (unreleased)
+
+- Clear stale `spec.strategy.rollingUpdate` when patching the server `Deployment` to `Recreate`, fixing 422 reconcile loops on clusters upgraded from older operator builds that used `RollingUpdate`.
+
+## 1.10.5-op.3
 
 - Grant `get`, `list`, and `watch` on `apps/deployments` in the operator ClusterRole so in-cluster reconciliation can read the live server image (fixes 403 on `on_resume` / `on_update` version drift handling).
 - Remove dead ClusterRole rules: admission webhook configs (invalid `admissionregistration.k8s.io/v1` apiGroups and unused in `--standalone` kopf) and `extensions`/`batch` CronJobs (no CronJob templates; backups are in-server `online_backup`).
