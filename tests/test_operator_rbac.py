@@ -30,11 +30,21 @@ def _kubectl_reachable() -> bool:
 
 
 def _resource_for_can_i(api_group: str, resource: str) -> str:
-    if "/" in resource:
-        return resource
     if api_group:
         return f"{resource}.{api_group}"
     return resource
+
+
+def _auth_can_i_args(api_group: str, resource: str, verb: str) -> list[str]:
+    args = ["auth", "can-i", verb, f"--as={OPERATOR_SA}"]
+    if resource.endswith("/status"):
+        plural = resource.removesuffix("/status")
+        args.extend([plural, f"--api-group={api_group}", "--subresource=status"])
+    else:
+        args.append(_resource_for_can_i(api_group, resource))
+    if (api_group, resource) not in _CLUSTER_SCOPED:
+        args.extend(["--namespace", KANIDM_NAMESPACE])
+    return args
 
 
 def _iter_cluster_role_checks():
@@ -70,16 +80,8 @@ def test_operator_service_account_can_use_shipped_cluster_role(
     operator_rbac_applied, api_group: str, resource: str, verb: str
 ):
     """Each verb in manifests/operator/cluster-role.yaml must be allowed for the operator SA."""
-    resource_name = _resource_for_can_i(api_group, resource)
-    args = [
-        "auth",
-        "can-i",
-        verb,
-        resource_name,
-        f"--as={OPERATOR_SA}",
-    ]
-    if (api_group, resource) not in _CLUSTER_SCOPED:
-        args.extend(["--namespace", KANIDM_NAMESPACE])
+    args = _auth_can_i_args(api_group, resource, verb)
+    resource_name = args[3] if resource.endswith("/status") else args[3]
     result = kubectl(*args, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "yes", (

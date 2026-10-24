@@ -22,7 +22,7 @@ rules:
     verbs: [list, watch, patch]
   - apiGroups: [kanidm.github.io]
     resources: [kanidms/status]
-    verbs: [get, patch, update]
+    verbs: [get, patch]
 
   # Application: other resources the operator creates and manages.
   - apiGroups: [apps]

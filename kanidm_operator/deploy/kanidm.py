@@ -25,7 +25,11 @@ from kanidm_operator.deploy.kanidm_deployment import (
     KANIDM_DEPLOYMENT_NAME,
     get_deployed_server_image,
 )
-from kanidm_operator.deploy.kanidm_status import ReconcileTrigger, write_kanidm_status
+from kanidm_operator.deploy.kanidm_status import (
+    ReconcileTrigger,
+    get_deployment_replica_status,
+    write_kanidm_status,
+)
 from kanidm_operator.deployer import Deployer
 from kanidm_operator.typing.kanidm import KanidmResource
 
@@ -232,6 +236,13 @@ def _finalize_kanidm_status(
         reconcile_error=reconcile_error,
         existing_status=existing_status,
     )
+    if reconcile_error is None and trigger in ("update", "resume"):
+        deployment = get_deployment_replica_status(namespace)
+        if deployment["availableReplicas"] < 1 or deployment["readyReplicas"] < 1:
+            raise kopf.TemporaryError(
+                "Waiting for Kanidm Deployment to become ready after reconcile",
+                delay=10,
+            )
 
 
 @kopf.on.create("kanidm.github.io", "v1alpha1", "kanidms")
