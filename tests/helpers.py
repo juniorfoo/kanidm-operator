@@ -128,6 +128,27 @@ def secret_data(namespace: str, name: str, key: str) -> str:
     return base64.b64decode(secret["data"][key]).decode("utf-8")
 
 
+def assert_kanidm_cr_status(
+    version: str = KANIDM_VERSION,
+    *,
+    ready: bool = True,
+    reconcile_result: str = "Success",
+) -> None:
+    """Assert the Kanidm CR status reflects a reconciled server."""
+    cr = kubectl_json("get", "kanidm", "kanidm-instance", "-n", KANIDM_NAMESPACE)
+    status = cr.get("status") or {}
+    assert status.get("version") == version, status
+    assert status.get("image") == f"kanidm/server:{version}", status
+    assert status.get("lastReconcileResult") == reconcile_result, status
+    conditions = {item["type"]: item for item in status.get("conditions", [])}
+    assert conditions["Ready"]["status"] == ("True" if ready else "False"), conditions
+    assert conditions["Degraded"]["status"] == ("False" if ready else "True"), conditions
+    annotations = cr.get("metadata", {}).get("annotations", {})
+    for key, value in annotations.items():
+        if key.startswith("kopf.zalando.org/") and value:
+            assert "422" not in value, f"stale kopf annotation {key}: {value}"
+
+
 def wait_processed(resource: str, name: str, timeout: str = "180s") -> None:
     kubectl(
         "wait",
@@ -298,13 +319,12 @@ def stamp_legacy_rolling_update_deployment(image_tag: str = "1.10.3") -> None:
 def stamp_kopf_last_handled_configuration(resource: str, name: str) -> None:
     """Make kopf believe the current CR body is already handled (Joe's drift scenario)."""
     import kopf
-    from kopf._cogs.configs.diffbase import AnnotationsDiffBaseStorage
+    from kopf._cogs.configs.diffbase import StatusDiffBaseStorage
 
     cr = kubectl_json("get", resource, name, "-n", KANIDM_NAMESPACE)
-    storage = AnnotationsDiffBaseStorage()
+    storage = StatusDiffBaseStorage(name="kopf")
     essence = storage.build(body=kopf.Body(cr))
-    encoded = json.dumps(essence, separators=(",", ":")) + "\n"
-    annotation_key = "kopf.zalando.org/last-handled-configuration"
+    encoded = json.dumps(essence, separators=(",", ":"))
     kubectl(
         "patch",
         resource,
@@ -313,7 +333,41 @@ def stamp_kopf_last_handled_configuration(resource: str, name: str) -> None:
         KANIDM_NAMESPACE,
         "--type=merge",
         "-p",
-        json.dumps({"metadata": {"annotations": {annotation_key: encoded}}}),
+        json.dumps(
+            {
+                "status": {
+                    "kopf": {"last-handled-configuration": encoded},
+                }
+            }
+        ),
+    )
+
+
+def stamp_kopf_failure_annotation(handler_id: str, message: str) -> None:
+    """Simulate a stale kopf progress annotation from a prior failed reconcile."""
+    kubectl(
+        "patch",
+        "kanidm",
+        "kanidm-instance",
+        "-n",
+        KANIDM_NAMESPACE,
+        "--type=merge",
+        "-p",
+        json.dumps(
+            {
+                "metadata": {
+                    "annotations": {
+                        f"kopf.zalando.org/{handler_id}": json.dumps(
+                            {
+                                "failure": True,
+                                "success": False,
+                                "message": message,
+                            }
+                        ),
+                    }
+                }
+            }
+        ),
     )
 
 

@@ -13,10 +13,70 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
           type: object
           properties:
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                version:
+                  type: string
+                image:
+                  type: string
+                readyReplicas:
+                  type: integer
+                  format: int32
+                availableReplicas:
+                  type: integer
+                  format: int32
+                lastReconcileTime:
+                  type: string
+                  format: date-time
+                lastReconcileResult:
+                  type: string
+                  enum:
+                    - Success
+                    - Failed
+                    - InProgress
+                lastReconcileMessage:
+                  type: string
+                lastReconcileTrigger:
+                  type: string
+                  enum:
+                    - create
+                    - update
+                    - resume
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                kopf:
+                  x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               required:

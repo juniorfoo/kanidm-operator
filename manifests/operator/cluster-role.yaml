@@ -20,6 +20,9 @@ rules:
   - apiGroups: [kanidm.github.io]
     resources: [groups, oauth2-clients, kanidms, users]
     verbs: [list, watch, patch]
+  - apiGroups: [kanidm.github.io]
+    resources: [kanidms/status]
+    verbs: [get, patch, update]
 
   # Application: other resources the operator creates and manages.
   - apiGroups: [apps]

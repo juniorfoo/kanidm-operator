@@ -9,6 +9,7 @@ import pytest
 from tests.helpers import (
     KanidmVerifier,
     assert_admin_secrets,
+    assert_kanidm_cr_status,
     assert_https_reachable,
     assert_kanidm_configmap,
     assert_kanidm_deployment,
@@ -126,6 +127,7 @@ def test_resource_lifecycle():
         )
 
         assert_kanidm_deployment()
+        assert_kanidm_cr_status()
         assert_kanidm_configmap()
         assert_kanidm_ingress()
         assert_admin_secrets()
