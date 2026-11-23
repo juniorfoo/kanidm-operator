@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.5-op.8 (unreleased)
+
+- security: aiohttp 3.14.5 (#11, closes #10).
+
 ## 1.10.5-op.7 (unreleased)
 
 - Run blocking Kanidm CLI and Kubernetes client work in Kopf's thread-pool executor (sync handlers) so the built-in `--liveness` server on `:8080/healthz` stays responsive during bulk User/Group/OAuth2 resume after a kopf persistence migration.
